@@ -133,7 +133,7 @@ print_info "Searching for files matching pattern '$FIND_PATTERN'..."
 FOUND_FILES=()
 while IFS= read -r -d '' file; do
     FOUND_FILES+=("$file")
-done < <(find "$START_DIR" -type f -maxdepth 3 -name "$FIND_PATTERN" -print0 2>/dev/null)
+done < <(find "$START_DIR" -type f -maxdepth 3 -iname "$FIND_PATTERN" -print0 2>/dev/null)
 
 if [ ${#FOUND_FILES[@]} -eq 0 ]; then
     print_warning "No files found matching pattern '$FIND_PATTERN'"

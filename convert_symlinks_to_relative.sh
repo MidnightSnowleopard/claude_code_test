@@ -130,7 +130,7 @@ print_info "Searching for symbolic links matching pattern '$SEARCH_PATTERN'..."
 FOUND_LINKS=()
 while IFS= read -r -d '' link; do
     FOUND_LINKS+=("$link")
-done < <(find "$SEARCH_PATH_ABS" -type l -name "$SEARCH_PATTERN" -print0 2>/dev/null)
+done < <(find "$SEARCH_PATH_ABS" -type l -iname "$SEARCH_PATTERN" -print0 2>/dev/null)
 
 if [ ${#FOUND_LINKS[@]} -eq 0 ]; then
     print_warning "No symbolic links found matching pattern '$SEARCH_PATTERN' in $SEARCH_PATH_ABS"
