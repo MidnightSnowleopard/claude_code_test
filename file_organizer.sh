@@ -6,7 +6,7 @@
 # This script:
 # 1. Searches the current directory for files matching the pattern
 # 2. Moves found files to a target directory
-# 3. Creates symlinks from original locations to new locations
+# 3. Creates relative symlinks from original locations to new locations
 # 4. Creates hard links in a parent directory
 #
 # All inputs are treated as literal strings with proper quoting
@@ -118,9 +118,10 @@ for file in "${FOUND_FILES[@]}"; do
     if mv -- "$FILE_ABS_PATH" "$TARGET_FILE"; then
         print_info "  → Moved to: $TARGET_FILE"
 
-        # Create symlink from original location to new location
-        if ln -s -- "$TARGET_FILE" "$FILE_ABS_PATH"; then
-            print_info "  → Created symlink: $FILE_ABS_PATH -> $TARGET_FILE"
+        # Create symlink from original location to new location (using relative path)
+        RELATIVE_TARGET="$(realpath --relative-to="$(dirname -- "$FILE_ABS_PATH")" -- "$TARGET_FILE")"
+        if ln -s -- "$RELATIVE_TARGET" "$FILE_ABS_PATH"; then
+            print_info "  → Created symlink: $FILE_ABS_PATH -> $RELATIVE_TARGET"
         else
             print_error "  → Failed to create symlink at $FILE_ABS_PATH"
             ERROR_COUNT=$((ERROR_COUNT + 1))
