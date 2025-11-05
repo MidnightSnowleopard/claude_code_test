@@ -9,6 +9,8 @@ A bash script that searches for files matching a pattern, moves them to an organ
 - **Symbolic links**: Maintains access from original locations
 - **Hard links**: Creates additional references in a parent directory
 - **Collision handling**: Automatically renames files if duplicates exist
+- **Special character support**: Safely handles files and directories with spaces, quotes, and other special characters
+- **Folder name sanitization**: Automatically sanitizes problematic characters in folder names
 - **Color-coded output**: Easy-to-read status messages
 
 ## Usage
@@ -20,7 +22,7 @@ A bash script that searches for files matching a pattern, moves them to an organ
 ### Arguments
 
 1. **find_pattern**: The pattern to search for (e.g., `*.txt`, `*.log`, `*.jpg`)
-2. **folder_name**: Name of the folder to organize files into (alphanumeric, underscore, and hyphen only)
+2. **folder_name**: Name of the folder to organize files into (special characters will be automatically sanitized)
 
 ### Example
 
@@ -33,6 +35,10 @@ A bash script that searches for files matching a pattern, moves them to an organ
 
 # Organize images
 ./file_organizer.sh '*.jpg' photos
+
+# Folder names with special characters are automatically sanitized
+./file_organizer.sh '*.pdf' "My Documents: 2024/2025"
+# This creates folder: /tmp/organized/My Documents_ 2024_2025
 ```
 
 ## How It Works
@@ -70,6 +76,44 @@ The script uses these fixed arguments for the `find` command:
 - `-type f`: Only find regular files (not directories)
 - `-maxdepth 3`: Limit search to 3 directory levels deep
 - `-name <pattern>`: Match files using the provided pattern
+
+## Special Character Handling
+
+The script is designed to safely handle special characters in both filenames and directory names:
+
+### File Names
+The script correctly processes files with:
+- Spaces: `file with spaces.txt`
+- Single quotes: `file'with'quotes.txt`
+- Double quotes: `file"with"quotes.txt`
+- Parentheses: `file(with)parens.txt`
+- Brackets: `file[with]brackets.txt`
+- Braces: `file{with}braces.txt`
+- Special symbols: `@`, `#`, `$`, `&`, `;`
+- Multiple dots: `file...with...dots.txt`
+- Leading dashes: `-starts-with-dash.txt`
+
+### Directory Names
+Folder names are automatically sanitized for filesystem compatibility:
+- Path separators (`/`, `\`) → underscore
+- Wildcards (`*`, `?`) → underscore
+- Quotes (`"`) → underscore
+- Pipes and redirects (`|`, `<`, `>`) → underscore
+- Colons (`:`) → underscore
+- Leading/trailing dots and underscores are removed
+- Multiple consecutive underscores are collapsed into one
+
+Example:
+```bash
+# Input: "test folder: with/special*chars"
+# Sanitized to: "test folder_ with_special_chars"
+```
+
+### Implementation Details
+- Uses null-delimited output (`find -print0`) to safely handle newlines in filenames
+- All path operations use proper quoting and the `--` separator
+- Uses `printf` instead of `echo` for safe output of special characters
+- Employs dedicated functions for filename parsing and collision handling
 
 ## Important Notes
 
@@ -120,10 +164,12 @@ Example output:
 
 ## Security Considerations
 
-- The script validates folder names to prevent path traversal attacks
-- Uses proper quoting to handle filenames with spaces
-- Uses `set -e` to exit on errors
-- Provides absolute paths for symlinks
+- **Path traversal prevention**: Sanitizes folder names to block path separators and null bytes
+- **Proper quoting**: All variables are quoted and use `--` separators to prevent command injection
+- **Safe operations**: Uses `set -e` to exit on errors
+- **Absolute paths**: Symlinks use absolute paths for consistency
+- **Special character protection**: Uses `printf` with format strings instead of `echo` to prevent interpretation of escape sequences
+- **Null delimiter**: Uses null-delimited file lists to safely handle any filename, including those with newlines
 
 ## Requirements
 

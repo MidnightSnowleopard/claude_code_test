@@ -8,8 +8,11 @@
 # 2. Moves found files to a target directory
 # 3. Creates symlinks from original locations to new locations
 # 4. Creates hard links in a parent directory
+#
+# Handles special characters in filenames and directory names safely
 
 set -e  # Exit on error
+shopt -s nullglob  # Handle empty globs gracefully
 
 # Configuration
 STATIC_BASE_PATH="/tmp/organized"  # Static base path for organized files
@@ -21,17 +24,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Function to print colored messages
+# Function to print colored messages (handles special characters safely)
 print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    printf "${GREEN}[INFO]${NC} %s\n" "$1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    printf "${RED}[ERROR]${NC} %s\n" "$1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    printf "${YELLOW}[WARNING]${NC} %s\n" "$1"
 }
 
 # Validate input arguments
@@ -49,12 +52,51 @@ if [ $# -ne 2 ]; then
 fi
 
 FIND_PATTERN="$1"
-FOLDER_NAME="$2"
+FOLDER_NAME_RAW="$2"
 
-# Validate folder name (no special characters that could cause issues)
-if [[ ! "$FOLDER_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    print_error "Folder name contains invalid characters. Use only alphanumeric, underscore, and hyphen."
-    exit 1
+# Sanitize folder name to handle special characters
+# Replace problematic characters with underscores, preserve safe special chars
+sanitize_folder_name() {
+    local name="$1"
+    # Remove leading/trailing whitespace
+    name="${name#"${name%%[![:space:]]*}"}"
+    name="${name%"${name##*[![:space:]]}"}"
+
+    # Replace path separators and null bytes (security)
+    name="${name//\//_}"
+    name="${name//$'\0'/_}"
+
+    # Replace other problematic characters for filesystems
+    name="${name//\\/_}"
+    name="${name//:/_}"
+    name="${name//\*/_}"
+    name="${name//\?/_}"
+    name="${name//\"/_}"
+    name="${name//</_}"
+    name="${name//>/_}"
+    name="${name//|/_}"
+
+    # Collapse multiple underscores
+    while [[ "$name" =~ __ ]]; do
+        name="${name//__/_}"
+    done
+
+    # Remove leading/trailing underscores and dots
+    name="${name#[_.]}"
+    name="${name%[_.]}"
+
+    # Ensure we have a valid name
+    if [ -z "$name" ]; then
+        name="organized_files"
+    fi
+
+    echo "$name"
+}
+
+FOLDER_NAME="$(sanitize_folder_name "$FOLDER_NAME_RAW")"
+
+if [ "$FOLDER_NAME" != "$FOLDER_NAME_RAW" ]; then
+    print_warning "Folder name sanitized from '$FOLDER_NAME_RAW' to '$FOLDER_NAME'"
 fi
 
 # Set up target directories
@@ -91,44 +133,82 @@ fi
 print_info "Found ${#FOUND_FILES[@]} file(s)"
 echo ""
 
+# Function to safely split filename into base and extension
+split_filename() {
+    local filename="$1"
+    local base ext
+
+    # Check if file has an extension (last dot that's not at the start)
+    if [[ "$filename" =~ \. && "$filename" != .* ]]; then
+        # Get extension (everything after the last dot)
+        ext="${filename##*.}"
+        # Get base name (everything before the last dot)
+        base="${filename%.*}"
+
+        # If the "extension" is too long (>10 chars) or empty, treat as no extension
+        if [ ${#ext} -gt 10 ] || [ -z "$ext" ]; then
+            base="$filename"
+            ext=""
+        fi
+    else
+        base="$filename"
+        ext=""
+    fi
+
+    echo "$base"
+    echo "$ext"
+}
+
+# Function to generate unique target filename
+get_unique_filename() {
+    local target_dir="$1"
+    local base_name="$2"
+    local extension="$3"
+    local target_file counter
+
+    if [ -n "$extension" ]; then
+        target_file="${target_dir}/${base_name}.${extension}"
+    else
+        target_file="${target_dir}/${base_name}"
+    fi
+
+    counter=1
+    while [ -e "$target_file" ]; do
+        if [ -n "$extension" ]; then
+            target_file="${target_dir}/${base_name}_${counter}.${extension}"
+        else
+            target_file="${target_dir}/${base_name}_${counter}"
+        fi
+        counter=$((counter + 1))
+    done
+
+    echo "$target_file"
+}
+
 # Process each found file
 SUCCESS_COUNT=0
 ERROR_COUNT=0
 
 for file in "${FOUND_FILES[@]}"; do
     # Get absolute path of the file
-    FILE_ABS_PATH="$(realpath "$file")"
-    FILE_NAME="$(basename "$file")"
-    FILE_DIR="$(dirname "$FILE_ABS_PATH")"
+    FILE_ABS_PATH="$(realpath -- "$file")"
+    FILE_NAME="$(basename -- "$file")"
+    FILE_DIR="$(dirname -- "$FILE_ABS_PATH")"
 
     print_info "Processing: $file"
 
-    # Create unique filename if file already exists in target
-    TARGET_FILE="$TARGET_DIR/$FILE_NAME"
-    COUNTER=1
-    BASE_NAME="${FILE_NAME%.*}"
-    EXTENSION="${FILE_NAME##*.}"
+    # Split filename into base and extension
+    IFS=$'\n' read -r -d '' BASE_NAME EXTENSION < <(split_filename "$FILE_NAME" && printf '\0')
 
-    # Handle files without extension
-    if [ "$BASE_NAME" = "$EXTENSION" ]; then
-        EXTENSION=""
-    fi
-
-    while [ -e "$TARGET_FILE" ]; do
-        if [ -n "$EXTENSION" ]; then
-            TARGET_FILE="$TARGET_DIR/${BASE_NAME}_${COUNTER}.${EXTENSION}"
-        else
-            TARGET_FILE="$TARGET_DIR/${FILE_NAME}_${COUNTER}"
-        fi
-        COUNTER=$((COUNTER + 1))
-    done
+    # Generate unique target filename
+    TARGET_FILE="$(get_unique_filename "$TARGET_DIR" "$BASE_NAME" "$EXTENSION")"
 
     # Move the file to target directory
-    if mv "$FILE_ABS_PATH" "$TARGET_FILE"; then
+    if mv -- "$FILE_ABS_PATH" "$TARGET_FILE"; then
         print_info "  → Moved to: $TARGET_FILE"
 
         # Create symlink from original location to new location
-        if ln -s "$TARGET_FILE" "$FILE_ABS_PATH"; then
+        if ln -s -- "$TARGET_FILE" "$FILE_ABS_PATH"; then
             print_info "  → Created symlink: $FILE_ABS_PATH -> $TARGET_FILE"
         else
             print_error "  → Failed to create symlink at $FILE_ABS_PATH"
@@ -137,8 +217,8 @@ for file in "${FOUND_FILES[@]}"; do
         fi
 
         # Create hard link in the parent directory
-        HARDLINK_FILE="$HARDLINK_DIR/$(basename "$TARGET_FILE")"
-        if ln "$TARGET_FILE" "$HARDLINK_FILE" 2>/dev/null; then
+        HARDLINK_FILE="$HARDLINK_DIR/$(basename -- "$TARGET_FILE")"
+        if ln -- "$TARGET_FILE" "$HARDLINK_FILE" 2>/dev/null; then
             print_info "  → Created hard link: $HARDLINK_FILE"
         else
             print_warning "  → Could not create hard link (file may be on different filesystem)"
