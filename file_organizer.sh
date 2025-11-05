@@ -36,6 +36,56 @@ print_warning() {
     printf '%b[WARNING]%b %s\n' "${YELLOW}" "${NC}" "$1"
 }
 
+# Function to calculate relative path from one directory to another
+# Usage: get_relative_path FROM TO
+get_relative_path() {
+    local from="$1"
+    local to="$2"
+    local common up result
+
+    # Normalize paths (remove trailing slashes)
+    from="${from%/}"
+    to="${to%/}"
+
+    # Split paths into arrays
+    IFS='/' read -ra from_parts <<< "$from"
+    IFS='/' read -ra to_parts <<< "$to"
+
+    # Find common prefix
+    local common_parts=0
+    local max_parts=${#from_parts[@]}
+    [ ${#to_parts[@]} -lt $max_parts ] && max_parts=${#to_parts[@]}
+
+    for ((i=0; i<max_parts; i++)); do
+        if [ "${from_parts[$i]}" = "${to_parts[$i]}" ]; then
+            common_parts=$((i + 1))
+        else
+            break
+        fi
+    done
+
+    # Build relative path
+    result=""
+
+    # Add ../ for each remaining part in from_parts
+    for ((i=common_parts; i<${#from_parts[@]}; i++)); do
+        result="${result}../"
+    done
+
+    # Add remaining parts from to_parts
+    for ((i=common_parts; i<${#to_parts[@]}; i++)); do
+        result="${result}${to_parts[$i]}/"
+    done
+
+    # Remove trailing slash
+    result="${result%/}"
+
+    # If result is empty, paths are the same
+    [ -z "$result" ] && result="."
+
+    echo "$result"
+}
+
 # Validate input arguments
 if [ $# -ne 2 ]; then
     print_error "Invalid number of arguments"
@@ -83,7 +133,7 @@ print_info "Searching for files matching pattern '$FIND_PATTERN'..."
 FOUND_FILES=()
 while IFS= read -r -d '' file; do
     FOUND_FILES+=("$file")
-done < <(find "$START_DIR" -type f -maxdepth 3 -name "$FIND_PATTERN" -print0 2>/dev/null)
+done < <(find "$START_DIR" -type f -maxdepth 3 -iname "$FIND_PATTERN" -print0 2>/dev/null)
 
 if [ ${#FOUND_FILES[@]} -eq 0 ]; then
     print_warning "No files found matching pattern '$FIND_PATTERN'"
@@ -99,7 +149,7 @@ ERROR_COUNT=0
 
 for file in "${FOUND_FILES[@]}"; do
     # Get file information - all as literal strings
-    FILE_ABS_PATH="$(realpath -- "$file")"
+    FILE_ABS_PATH="$(realpath "$file")"
     FILE_NAME="$(basename -- "$file")"
 
     print_info "Processing: $file"
@@ -119,7 +169,7 @@ for file in "${FOUND_FILES[@]}"; do
         print_info "  → Moved to: $TARGET_FILE"
 
         # Create symlink from original location to new location (using relative path)
-        RELATIVE_TARGET="$(realpath --relative-to="$(dirname -- "$FILE_ABS_PATH")" -- "$TARGET_FILE")"
+        RELATIVE_TARGET="$(get_relative_path "$(dirname "$FILE_ABS_PATH")" "$TARGET_FILE")"
         if ln -s -- "$RELATIVE_TARGET" "$FILE_ABS_PATH"; then
             print_info "  → Created symlink: $FILE_ABS_PATH -> $RELATIVE_TARGET"
         else

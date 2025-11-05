@@ -36,6 +36,56 @@ print_success() {
     printf '%b[SUCCESS]%b %s\n' "${BLUE}" "${NC}" "$1"
 }
 
+# Function to calculate relative path from one directory to another
+# Usage: get_relative_path FROM TO
+get_relative_path() {
+    local from="$1"
+    local to="$2"
+    local common up result
+
+    # Normalize paths (remove trailing slashes)
+    from="${from%/}"
+    to="${to%/}"
+
+    # Split paths into arrays
+    IFS='/' read -ra from_parts <<< "$from"
+    IFS='/' read -ra to_parts <<< "$to"
+
+    # Find common prefix
+    local common_parts=0
+    local max_parts=${#from_parts[@]}
+    [ ${#to_parts[@]} -lt $max_parts ] && max_parts=${#to_parts[@]}
+
+    for ((i=0; i<max_parts; i++)); do
+        if [ "${from_parts[$i]}" = "${to_parts[$i]}" ]; then
+            common_parts=$((i + 1))
+        else
+            break
+        fi
+    done
+
+    # Build relative path
+    result=""
+
+    # Add ../ for each remaining part in from_parts
+    for ((i=common_parts; i<${#from_parts[@]}; i++)); do
+        result="${result}../"
+    done
+
+    # Add remaining parts from to_parts
+    for ((i=common_parts; i<${#to_parts[@]}; i++)); do
+        result="${result}${to_parts[$i]}/"
+    done
+
+    # Remove trailing slash
+    result="${result%/}"
+
+    # If result is empty, paths are the same
+    [ -z "$result" ] && result="."
+
+    echo "$result"
+}
+
 # Validate input arguments
 if [ $# -eq 0 ]; then
     print_error "Missing required argument: search_pattern"
@@ -68,7 +118,7 @@ if [ ! -d "$SEARCH_PATH" ]; then
 fi
 
 # Get absolute path of search directory
-SEARCH_PATH_ABS="$(realpath -- "$SEARCH_PATH")"
+SEARCH_PATH_ABS="$(realpath "$SEARCH_PATH")"
 
 print_info "Starting symlink conversion..."
 print_info "Search pattern: $SEARCH_PATTERN"
@@ -80,7 +130,7 @@ print_info "Searching for symbolic links matching pattern '$SEARCH_PATTERN'..."
 FOUND_LINKS=()
 while IFS= read -r -d '' link; do
     FOUND_LINKS+=("$link")
-done < <(find "$SEARCH_PATH_ABS" -type l -name "$SEARCH_PATTERN" -print0 2>/dev/null)
+done < <(find "$SEARCH_PATH_ABS" -type l -iname "$SEARCH_PATTERN" -print0 2>/dev/null)
 
 if [ ${#FOUND_LINKS[@]} -eq 0 ]; then
     print_warning "No symbolic links found matching pattern '$SEARCH_PATTERN' in $SEARCH_PATH_ABS"
@@ -116,13 +166,13 @@ for link in "${FOUND_LINKS[@]}"; do
         fi
 
         # Get absolute path of the target
-        TARGET_ABS="$(realpath -- "$link")"
+        TARGET_ABS="$(realpath "$link")"
 
         # Get directory containing the symlink
-        LINK_DIR="$(dirname -- "$link")"
+        LINK_DIR="$(dirname "$link")"
 
         # Calculate relative path from link location to target
-        RELATIVE_TARGET="$(realpath --relative-to="$LINK_DIR" -- "$TARGET_ABS")"
+        RELATIVE_TARGET="$(get_relative_path "$LINK_DIR" "$TARGET_ABS")"
 
         # Remove the old symlink and create new relative one
         if rm -- "$link" && ln -s -- "$RELATIVE_TARGET" "$link"; then
