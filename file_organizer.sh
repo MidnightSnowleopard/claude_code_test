@@ -140,9 +140,9 @@ if [[ "$FOLDER_NAME" == */* ]]; then
     exit 1
 fi
 
-# Set up target directories (use hardlink path relative to base path)
+# Set up target directories (use .staging subfolder for hardlinks)
 TARGET_DIR="${BASE_PATH}/${FOLDER_NAME}"
-HARDLINK_DIR="${BASE_PATH}_hardlinks/${FOLDER_NAME}"
+HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}"
 
 print_info "Starting file organization..."
 print_info "Path key: $PATH_KEY"
