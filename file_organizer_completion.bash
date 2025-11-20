@@ -27,10 +27,10 @@ _file_organizer_complete() {
         local keys="${!_FILE_ORGANIZER_BASE_PATHS[@]}"
         COMPREPLY=($(compgen -W "$keys" -- "$cur"))
 
-    # Second argument: file pattern (suggest common patterns)
+    # Second argument: file pattern (no suggestions - user enters pattern freely)
     elif [ $COMP_CWORD -eq 2 ]; then
-        local patterns="*.txt *.log *.pdf *.jpg *.png *.doc *.docx *.zip *.tar.gz *.mp4 *.mp3"
-        COMPREPLY=($(compgen -W "$patterns" -- "$cur"))
+        COMPREPLY=()
+        return
 
     # Third argument: folder name - suggest from existing folders using path key
     elif [ $COMP_CWORD -eq 3 ]; then
