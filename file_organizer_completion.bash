@@ -51,7 +51,17 @@ _file_organizer_complete() {
                 folder="$(basename "$folder")"
                 # Check if it matches the current input
                 if [[ "$folder" == "$cur"* ]]; then
-                    COMPREPLY+=("$folder")
+                    # Escape spaces and special characters for bash
+                    local escaped="${folder//\\/\\\\}"  # Escape backslashes first
+                    escaped="${escaped// /\\ }"          # Escape spaces
+                    escaped="${escaped//\'/\\\'}"        # Escape single quotes
+                    escaped="${escaped//\"/\\\"}"        # Escape double quotes
+                    escaped="${escaped//(/\\(}"          # Escape parentheses
+                    escaped="${escaped//)/\\)}"
+                    escaped="${escaped//&/\\&}"          # Escape ampersand
+                    escaped="${escaped//;/\\;}"          # Escape semicolon
+                    escaped="${escaped//|/\\|}"          # Escape pipe
+                    COMPREPLY+=("$escaped")
                 fi
             done < <(cd "$base_path" 2>/dev/null && find . -maxdepth 1 -type d ! -name '.' -print0 2>/dev/null)
             return 0
