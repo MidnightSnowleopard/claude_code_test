@@ -26,11 +26,12 @@ _file_organizer_complete() {
     if [ $COMP_CWORD -eq 1 ]; then
         local keys="${!_FILE_ORGANIZER_BASE_PATHS[@]}"
         COMPREPLY=($(compgen -W "$keys" -- "$cur"))
+        return 0
 
     # Second argument: file pattern (no suggestions - user enters pattern freely)
     elif [ $COMP_CWORD -eq 2 ]; then
         COMPREPLY=()
-        return
+        return 0
 
     # Third argument: folder name - suggest from existing folders using path key
     elif [ $COMP_CWORD -eq 3 ]; then
@@ -42,8 +43,11 @@ _file_organizer_complete() {
             # List subdirectories in the base path
             local folders=$(cd "$base_path" 2>/dev/null && ls -d */ 2>/dev/null | sed 's#/##')
             COMPREPLY=($(compgen -W "$folders" -- "$cur"))
+            return 0
         fi
     fi
+
+    return 0
 }
 
 # Register completion for different invocation methods
