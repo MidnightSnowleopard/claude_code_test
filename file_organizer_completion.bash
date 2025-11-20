@@ -41,8 +41,19 @@ _file_organizer_complete() {
         # Check if base path exists and is a directory
         if [ -n "$base_path" ] && [ -d "$base_path" ]; then
             # List subdirectories in the base path
-            local folders=$(cd "$base_path" 2>/dev/null && ls -d */ 2>/dev/null | sed 's#/##')
-            COMPREPLY=($(compgen -W "$folders" -- "$cur"))
+            # Use array to properly handle spaces and special characters
+            local folder
+            COMPREPLY=()
+            while IFS= read -r -d '' folder; do
+                # Remove trailing slash
+                folder="${folder%/}"
+                # Get just the basename
+                folder="$(basename "$folder")"
+                # Check if it matches the current input
+                if [[ "$folder" == "$cur"* ]]; then
+                    COMPREPLY+=("$folder")
+                fi
+            done < <(cd "$base_path" 2>/dev/null && find . -maxdepth 1 -type d ! -name '.' -print0 2>/dev/null)
             return 0
         fi
     fi
