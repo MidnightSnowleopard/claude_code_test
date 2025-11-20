@@ -1,21 +1,26 @@
 #!/bin/bash
 
 # File Organizer Script
-# Usage: ./file_organizer.sh <find_pattern> <folder_name>
+# Usage: ./file_organizer.sh <path_key> <find_pattern> <folder_name>
 #
 # This script:
 # 1. Searches the current directory for files matching the pattern
-# 2. Moves found files to a target directory
+# 2. Moves found files to a pre-defined base directory selected by key
 # 3. Creates relative symlinks from original locations to new locations
-# 4. Creates hard links in a parent directory
+# 4. Creates hard links in a parallel directory structure
 #
 # All inputs are treated as literal strings with proper quoting
 
 set -e  # Exit on error
 
-# Configuration
-STATIC_BASE_PATH="/tmp/organized"  # Static base path for organized files
-HARDLINK_BASE_PATH="/tmp/hardlinks"  # Base path for hard links (one level above)
+# Pre-defined base paths - customize these for your needs
+declare -A BASE_PATHS=(
+    ["temp"]="/tmp/organized"
+    ["archives"]="/home/user/archives"
+    ["documents"]="/home/user/Documents/organized"
+    ["downloads"]="/home/user/Downloads/organized"
+    ["media"]="/home/user/media/organized"
+)
 
 # Color codes for output
 RED='\033[0;31m'
@@ -87,21 +92,47 @@ get_relative_path() {
 }
 
 # Validate input arguments
-if [ $# -ne 2 ]; then
+if [ $# -ne 3 ]; then
     print_error "Invalid number of arguments"
-    echo "Usage: $0 <find_pattern> <folder_name>"
+    echo "Usage: $0 <path_key> <find_pattern> <folder_name>"
     echo ""
     echo "Arguments:"
+    echo "  path_key      - Key for pre-defined base path (available: ${!BASE_PATHS[@]})"
     echo "  find_pattern  - Pattern to search for (e.g., '*.txt', '*.log')"
     echo "  folder_name   - Name of the folder to organize files into"
     echo ""
-    echo "Example:"
-    echo "  $0 '*.txt' text_files"
+    echo "Available path keys:"
+    for key in "${!BASE_PATHS[@]}"; do
+        echo "  $key -> ${BASE_PATHS[$key]}"
+    done
+    echo ""
+    echo "Examples:"
+    echo "  $0 temp '*.txt' text_files"
+    echo "  $0 archives '*.log' app_logs"
     exit 1
 fi
 
-FIND_PATTERN="$1"
-FOLDER_NAME="$2"
+PATH_KEY="$1"
+FIND_PATTERN="$2"
+FOLDER_NAME="$3"
+
+# Validate path key exists
+if [ -z "${BASE_PATHS[$PATH_KEY]}" ]; then
+    print_error "Invalid path key: $PATH_KEY"
+    echo "Available keys: ${!BASE_PATHS[@]}"
+    exit 1
+fi
+
+# Get the actual base path from the key
+BASE_PATH="${BASE_PATHS[$PATH_KEY]}"
+
+# Validate base path exists, create if needed
+if [ ! -d "$BASE_PATH" ]; then
+    print_warning "Base path does not exist: $BASE_PATH"
+    echo "Creating directory..."
+    mkdir -p "$BASE_PATH"
+    print_info "Created: $BASE_PATH"
+fi
 
 # Minimal folder name validation - only reject path separators for security
 if [[ "$FOLDER_NAME" == */* ]]; then
@@ -109,11 +140,13 @@ if [[ "$FOLDER_NAME" == */* ]]; then
     exit 1
 fi
 
-# Set up target directories
-TARGET_DIR="${STATIC_BASE_PATH}/${FOLDER_NAME}"
-HARDLINK_DIR="${HARDLINK_BASE_PATH}/${FOLDER_NAME}"
+# Set up target directories (use .staging subfolder for hardlinks)
+TARGET_DIR="${BASE_PATH}/${FOLDER_NAME}"
+HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}"
 
 print_info "Starting file organization..."
+print_info "Path key: $PATH_KEY"
+print_info "Base path: $BASE_PATH"
 print_info "Find pattern: $FIND_PATTERN"
 print_info "Target folder: $FOLDER_NAME"
 print_info "Target directory: $TARGET_DIR"
