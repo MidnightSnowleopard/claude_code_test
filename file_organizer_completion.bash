@@ -42,9 +42,9 @@ _file_organizer_complete() {
 
         # Check if base path exists and is a directory
         if [ -n "$base_path" ] && [ -d "$base_path" ]; then
-            # Use compgen -d to let bash handle all escaping/unescaping automatically
-            # Change to base path and use compgen to list directories
-            COMPREPLY=($(cd "$base_path" 2>/dev/null && compgen -d -- "$cur"))
+            # Use compgen -d and mapfile to properly handle directories with spaces
+            # mapfile reads line-by-line, so "One two" stays as one array element
+            mapfile -t COMPREPLY < <(cd "$base_path" 2>/dev/null && compgen -d -- "$cur")
             return 0
         fi
     fi
