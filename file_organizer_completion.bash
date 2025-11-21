@@ -42,30 +42,9 @@ _file_organizer_complete() {
 
         # Check if base path exists and is a directory
         if [ -n "$base_path" ] && [ -d "$base_path" ]; then
-            # List subdirectories in the base path
-            # Use array to properly handle spaces and special characters
-            local folder
-            COMPREPLY=()
-            while IFS= read -r -d '' folder; do
-                # Remove trailing slash
-                folder="${folder%/}"
-                # Get just the basename
-                folder="$(basename "$folder")"
-                # Check if it matches the current input
-                if [[ "$folder" == "$cur"* ]]; then
-                    # Escape spaces and special characters for bash
-                    local escaped="${folder//\\/\\\\}"  # Escape backslashes first
-                    escaped="${escaped// /\\ }"          # Escape spaces
-                    escaped="${escaped//\'/\\\'}"        # Escape single quotes
-                    escaped="${escaped//\"/\\\"}"        # Escape double quotes
-                    escaped="${escaped//(/\\(}"          # Escape parentheses
-                    escaped="${escaped//)/\\)}"
-                    escaped="${escaped//&/\\&}"          # Escape ampersand
-                    escaped="${escaped//;/\\;}"          # Escape semicolon
-                    escaped="${escaped//|/\\|}"          # Escape pipe
-                    COMPREPLY+=("$escaped")
-                fi
-            done < <(cd "$base_path" 2>/dev/null && find . -maxdepth 1 -type d ! -name '.' -print0 2>/dev/null)
+            # Use compgen -d to let bash handle all escaping/unescaping automatically
+            # Change to base path and use compgen to list directories
+            COMPREPLY=($(cd "$base_path" 2>/dev/null && compgen -d -- "$cur"))
             return 0
         fi
     fi
