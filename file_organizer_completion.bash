@@ -24,6 +24,9 @@ _file_organizer_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
 
+    # Enable filename-style completion to handle spaces automatically
+    compopt -o filenames 2>/dev/null || true
+
     # First argument: path key (suggest available keys)
     if [ $COMP_CWORD -eq 1 ]; then
         local keys="${!_FILE_ORGANIZER_BASE_PATHS[@]}"
