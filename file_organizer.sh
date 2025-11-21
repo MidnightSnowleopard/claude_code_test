@@ -14,12 +14,14 @@
 set -e  # Exit on error
 
 # Pre-defined base paths - customize these for your needs
+# Paths can contain spaces - they will be handled correctly
 declare -A BASE_PATHS=(
     ["temp"]="/tmp/organized"
     ["archives"]="/home/user/archives"
     ["documents"]="/home/user/Documents/organized"
     ["downloads"]="/home/user/Downloads/organized"
     ["media"]="/home/user/media/organized"
+    ["special"]="/tmp/My Organized Files"
 )
 
 # Color codes for output

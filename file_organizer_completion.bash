@@ -10,12 +10,14 @@
 #   FreeBSD: /usr/local/share/bash-completion/completions/
 
 # Pre-defined base paths - MUST match those in file_organizer.sh
+# Paths can contain spaces - they will be handled correctly
 declare -A _FILE_ORGANIZER_BASE_PATHS=(
     ["temp"]="/tmp/organized"
     ["archives"]="/home/user/archives"
     ["documents"]="/home/user/Documents/organized"
     ["downloads"]="/home/user/Downloads/organized"
     ["media"]="/home/user/media/organized"
+    ["special"]="/tmp/My Organized Files"
 )
 
 _file_organizer_complete() {
