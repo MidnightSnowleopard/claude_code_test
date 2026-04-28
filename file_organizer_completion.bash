@@ -73,27 +73,24 @@ _file_organizer_complete() {
                     fi
                 done < <(find "$show_dir" -maxdepth 1 -type d -name "Season *" -print0 2>/dev/null)
 
-                # Sort numerically, remove duplicates, and add next season
+                # Sort numerically and remove duplicates
                 if [ ${#seasons[@]} -gt 0 ]; then
                     local sorted=($(printf '%s\n' "${seasons[@]}" | sort -n -u))
-                    local max_season="${sorted[-1]}"
-                    local next_season=$((max_season + 1))
 
                     # Format all suggestions with 2-digit zero padding
                     local formatted=()
                     for s in "${sorted[@]}"; do
                         formatted+=("$(printf "%02d" "$s")")
                     done
-                    formatted+=("$(printf "%02d" "$next_season")")
 
                     COMPREPLY=($(compgen -W "${formatted[*]}" -- "$cur"))
                 else
-                    # No existing seasons, suggest 01
-                    COMPREPLY=($(compgen -W "01" -- "$cur"))
+                    # No existing seasons, no suggestions
+                    COMPREPLY=()
                 fi
             else
-                # Show directory doesn't exist yet, suggest season 01
-                COMPREPLY=($(compgen -W "01" -- "$cur"))
+                # Show directory doesn't exist yet, no suggestions
+                COMPREPLY=()
             fi
         fi
         return 0
