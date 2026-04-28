@@ -48,6 +48,47 @@ _file_organizer_complete() {
             mapfile -t COMPREPLY < <(cd "$base_path" 2>/dev/null && compgen -d -- "$cur")
         fi
         return 0
+
+    # Fourth argument: season number - suggest existing seasons from show folder
+    elif [ "$COMP_CWORD" -eq 4 ]; then
+        local path_key="${COMP_WORDS[1]}"
+        local show_name="${COMP_WORDS[3]}"
+        local base_path="${_FILE_ORGANIZER_BASE_PATHS[$path_key]}"
+
+        if [ -n "$base_path" ] && [ -n "$show_name" ]; then
+            local show_dir="${base_path}/${show_name}"
+
+            if [ -d "$show_dir" ]; then
+                # Find existing "Season X" directories and extract numbers
+                local seasons=()
+                local season_dir
+                while IFS= read -r -d '' season_dir; do
+                    local season_name=$(basename "$season_dir")
+                    # Extract number from "Season X" format
+                    if [[ "$season_name" =~ ^Season\ ([0-9]+)$ ]]; then
+                        seasons+=("${BASH_REMATCH[1]}")
+                    fi
+                done < <(find "$show_dir" -maxdepth 1 -type d -name "Season *" -print0 2>/dev/null)
+
+                # Sort numerically and add next season
+                if [ ${#seasons[@]} -gt 0 ]; then
+                    local sorted=($(printf '%s\n' "${seasons[@]}" | sort -n))
+                    local max_season="${sorted[-1]}"
+                    local next_season=$((max_season + 1))
+                    seasons+=("$next_season")
+                else
+                    # No existing seasons, suggest 1
+                    seasons=("1")
+                fi
+
+                # Generate completions matching current input
+                COMPREPLY=($(compgen -W "${seasons[*]}" -- "$cur"))
+            else
+                # Show directory doesn't exist yet, suggest season 1
+                COMPREPLY=($(compgen -W "1" -- "$cur"))
+            fi
+        fi
+        return 0
     fi
 
     return 0

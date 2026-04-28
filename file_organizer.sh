@@ -1,13 +1,14 @@
 #!/bin/bash
 
 # File Organizer Script
-# Usage: ./file_organizer.sh <path_key> <find_pattern> <folder_name>
+# Usage: ./file_organizer.sh <path_key> <find_pattern> <folder_name> [season_number]
 #
 # This script:
 # 1. Searches the current directory for files matching the pattern
 # 2. Moves found files to a pre-defined base directory selected by key
 # 3. Creates relative symlinks from original locations to new locations
 # 4. Creates hard links in a parallel directory structure
+# 5. Optionally organizes into season subdirectories (e.g., "Show/Season 1/")
 #
 # All inputs are treated as literal strings with proper quoting
 
@@ -92,14 +93,15 @@ get_relative_path() {
 }
 
 # Validate input arguments
-if [ $# -ne 3 ]; then
+if [ $# -lt 3 ] || [ $# -gt 4 ]; then
     print_error "Invalid number of arguments"
-    echo "Usage: $0 <path_key> <find_pattern> <folder_name>"
+    echo "Usage: $0 <path_key> <find_pattern> <folder_name> [season_number]"
     echo ""
     echo "Arguments:"
-    echo "  path_key      - Key for pre-defined base path (available: ${!BASE_PATHS[@]})"
-    echo "  find_pattern  - Pattern to search for (e.g., '*.txt', '*.log')"
-    echo "  folder_name   - Name of the folder to organize files into"
+    echo "  path_key       - Key for pre-defined base path (available: ${!BASE_PATHS[@]})"
+    echo "  find_pattern   - Pattern to search for (e.g., '*.txt', '*.mkv')"
+    echo "  folder_name    - Name of the folder to organize files into"
+    echo "  season_number  - (Optional) Season number for TV shows (creates Season X subfolder)"
     echo ""
     echo "Available path keys:"
     for key in "${!BASE_PATHS[@]}"; do
@@ -108,6 +110,7 @@ if [ $# -ne 3 ]; then
     echo ""
     echo "Examples:"
     echo "  $0 temp '*.txt' text_files"
+    echo "  $0 media '*.mkv' 'Breaking Bad' 2"
     echo "  $0 archives '*.log' app_logs"
     exit 1
 fi
@@ -115,6 +118,7 @@ fi
 PATH_KEY="$1"
 FIND_PATTERN="$2"
 FOLDER_NAME="$3"
+SEASON_NUMBER="${4:-}"  # Optional 4th argument
 
 # Validate path key exists
 if [ -z "${BASE_PATHS[$PATH_KEY]}" ]; then
@@ -140,15 +144,45 @@ if [[ "$FOLDER_NAME" == */* ]]; then
     exit 1
 fi
 
+# Validate season number if provided
+if [ -n "$SEASON_NUMBER" ]; then
+    if ! [[ "$SEASON_NUMBER" =~ ^[0-9]+$ ]]; then
+        print_error "Season number must be a positive integer"
+        exit 1
+    fi
+fi
+
 # Set up target directories (use .staging subfolder for hardlinks)
-TARGET_DIR="${BASE_PATH}/${FOLDER_NAME}"
-HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}"
+# If season number provided, add "Season X" subdirectory
+if [ -n "$SEASON_NUMBER" ]; then
+    SHOW_DIR="${BASE_PATH}/${FOLDER_NAME}"
+    TARGET_DIR="${SHOW_DIR}/Season ${SEASON_NUMBER}"
+    HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}/Season ${SEASON_NUMBER}"
+
+    # List existing seasons if show directory exists
+    if [ -d "$SHOW_DIR" ]; then
+        EXISTING_SEASONS=($(find "$SHOW_DIR" -maxdepth 1 -type d -name "Season *" 2>/dev/null | sort))
+        if [ ${#EXISTING_SEASONS[@]} -gt 0 ]; then
+            print_info "Existing seasons found:"
+            for season_dir in "${EXISTING_SEASONS[@]}"; do
+                echo "  - $(basename "$season_dir")"
+            done
+            echo ""
+        fi
+    fi
+else
+    TARGET_DIR="${BASE_PATH}/${FOLDER_NAME}"
+    HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}"
+fi
 
 print_info "Starting file organization..."
 print_info "Path key: $PATH_KEY"
 print_info "Base path: $BASE_PATH"
 print_info "Find pattern: $FIND_PATTERN"
 print_info "Target folder: $FOLDER_NAME"
+if [ -n "$SEASON_NUMBER" ]; then
+    print_info "Season number: $SEASON_NUMBER"
+fi
 print_info "Target directory: $TARGET_DIR"
 print_info "Hard link directory: $HARDLINK_DIR"
 echo ""
