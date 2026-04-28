@@ -64,28 +64,36 @@ _file_organizer_complete() {
                 local season_dir
                 while IFS= read -r -d '' season_dir; do
                     local season_name=$(basename "$season_dir")
-                    # Extract number from "Season X" format
+                    # Extract number from "Season X" format (handles 1, 01, 001, etc.)
                     if [[ "$season_name" =~ ^Season\ ([0-9]+)$ ]]; then
-                        seasons+=("${BASH_REMATCH[1]}")
+                        # Strip leading zeros for numerical value
+                        local num="${BASH_REMATCH[1]}"
+                        num=$((10#$num))  # Force base-10 interpretation, strips leading zeros
+                        seasons+=("$num")
                     fi
                 done < <(find "$show_dir" -maxdepth 1 -type d -name "Season *" -print0 2>/dev/null)
 
-                # Sort numerically and add next season
+                # Sort numerically, remove duplicates, and add next season
                 if [ ${#seasons[@]} -gt 0 ]; then
-                    local sorted=($(printf '%s\n' "${seasons[@]}" | sort -n))
+                    local sorted=($(printf '%s\n' "${seasons[@]}" | sort -n -u))
                     local max_season="${sorted[-1]}"
                     local next_season=$((max_season + 1))
-                    seasons+=("$next_season")
-                else
-                    # No existing seasons, suggest 1
-                    seasons=("1")
-                fi
 
-                # Generate completions matching current input
-                COMPREPLY=($(compgen -W "${seasons[*]}" -- "$cur"))
+                    # Format all suggestions with 2-digit zero padding
+                    local formatted=()
+                    for s in "${sorted[@]}"; do
+                        formatted+=("$(printf "%02d" "$s")")
+                    done
+                    formatted+=("$(printf "%02d" "$next_season")")
+
+                    COMPREPLY=($(compgen -W "${formatted[*]}" -- "$cur"))
+                else
+                    # No existing seasons, suggest 01
+                    COMPREPLY=($(compgen -W "01" -- "$cur"))
+                fi
             else
-                # Show directory doesn't exist yet, suggest season 1
-                COMPREPLY=($(compgen -W "1" -- "$cur"))
+                # Show directory doesn't exist yet, suggest season 01
+                COMPREPLY=($(compgen -W "01" -- "$cur"))
             fi
         fi
         return 0

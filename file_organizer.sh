@@ -153,11 +153,13 @@ if [ -n "$SEASON_NUMBER" ]; then
 fi
 
 # Set up target directories (use .staging subfolder for hardlinks)
-# If season number provided, add "Season X" subdirectory
+# If season number provided, add "Season XX" subdirectory with 2-digit zero padding
 if [ -n "$SEASON_NUMBER" ]; then
     SHOW_DIR="${BASE_PATH}/${FOLDER_NAME}"
-    TARGET_DIR="${SHOW_DIR}/Season ${SEASON_NUMBER}"
-    HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}/Season ${SEASON_NUMBER}"
+    # Always use 2-digit zero padding (01, 02, etc.)
+    SEASON_FOLDER=$(printf "Season %02d" "$SEASON_NUMBER")
+    TARGET_DIR="${SHOW_DIR}/${SEASON_FOLDER}"
+    HARDLINK_DIR="${BASE_PATH}/.staging/${FOLDER_NAME}/${SEASON_FOLDER}"
 
     # List existing seasons if show directory exists
     if [ -d "$SHOW_DIR" ]; then
